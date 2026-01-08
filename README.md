@@ -231,7 +231,7 @@ Access the interactive playground at `http://localhost:3000`:
 **Filipe Carboni Fim** - Civil Engineer
 
 [![GitHub](https://img.shields.io/badge/GitHub-@fcfim-181717?logo=github)](https://github.com/fcfim)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-fcfim-0A66C2?logo=linkedin)](https://linkedin.com/in/filipefim)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-filipefim-0A66C2?logo=linkedin)](https://linkedin.com/in/filipefim)
 
 ---
 
