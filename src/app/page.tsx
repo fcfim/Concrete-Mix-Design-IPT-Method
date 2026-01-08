@@ -339,7 +339,7 @@ export default function PlaygroundPage() {
                 </svg>
               </a>
               <a
-                href="https://linkedin.com/in/fcfim"
+                href="https://linkedin.com/in/filipefim"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`p-2 rounded-lg transition-colors ${
