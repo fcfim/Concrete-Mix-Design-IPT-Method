@@ -1,8 +1,12 @@
 # 🧱 Concrete Mix Design API - IPT/EPUSP Method
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+![Norma](https://img.shields.io/badge/ABNT-NBR_6118:2023-blue)
+![Norma](https://img.shields.io/badge/ABNT-NBR_12655:2022-blue)
+![Norma](https://img.shields.io/badge/ABNT-NBR_8953:2015-blue)
+
 
 A modern REST API for concrete mix design using the **IPT/EPUSP method**, widely adopted in Brazil for precise concrete proportioning based on experimental data.
 
@@ -220,10 +224,9 @@ Access the interactive playground at `http://localhost:3000`:
 
 ### Technical Resources
 
-- [IPT/EPUSP Method - Escola Politécnica USP](https://www.pcc.usp.br/)
-- [Duff Abrams Original Paper (1918)](https://en.wikipedia.org/wiki/Duff_Abrams)
-- [IBRACON - Instituto Brasileiro do Concreto](https://www.ibracon.org.br/)
-
+- IBRACON - Instituto Brasileiro do Concreto
+- IPT/EPUSP Method - Escola Politécnica USP
+- TUTIKIAN, Bernardo F.; HELENE, Paulo. Dosagem dos Concretos de Cimento Portland. In: ISAIA, Geraldo Cechella (ed.). Concreto: Ciência e Tecnologia. São Paulo: Ibracon, 2011. Cap. 12, p. 38. Disponível em: https://www.phd.eng.br/wpcontent/uploads/2014/07/lc56.pdf. Acesso em: 12 ago. 2021.
 ---
 
 ## 👨‍💻 Author
