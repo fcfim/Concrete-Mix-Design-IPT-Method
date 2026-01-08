@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,23 @@ const LinkedInIcon = () => (
   </svg>
 );
 
+const ConcreteIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 48 48"
+    width="24"
+    height="24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M13.791 8.531c9.642 1.561 23.859 12.716 11.405 32.97" />
+    <path d="M16.348 41.5c4.567-4.404 7.22-8.721 7.22-14.223c0-6.62-3.385-12.257-10.89-12.257c-4.95 0-7.178 2.557-7.178 5.736c0 4.26 3.425 5.473 5.538 5.473c3.048 0 4.064-3.016 4.064-3.016M32.8 41.5c4.456-11.339 6.967-21.015-6.162-35m13.109 35c4.14-12.06 3.411-21.046-.852-29.101" />
+  </svg>
+);
+
 // Schema de validação do formulário
 const formSchema = z.object({
   experimentalPoints: z
@@ -120,7 +138,23 @@ const formSchema = z.object({
   }),
 });
 
-type FormData = z.infer<typeof formSchema>;
+// FormData type (explicit definition for Zod v4 compatibility)
+interface FormData {
+  experimentalPoints: {
+    m: number;
+    ac: number;
+    fcj: number;
+    density: number;
+  }[];
+  target: {
+    fck: number;
+    sd: number;
+    aggressivenessClass: number;
+    elementType: "CA" | "CP";
+    slump: number;
+    mortarContent: number;
+  };
+}
 
 // Valores padrão para o formulário
 const defaultValues: FormData = {
@@ -174,17 +208,6 @@ export default function PlaygroundPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("form");
   const [darkMode, setDarkMode] = useState(false);
-  const [experimentalPoints, setExperimentalPoints] = useState(
-    defaultValues.experimentalPoints
-  );
-
-  useEffect(() => {
-    // Check system preference on mount
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    setDarkMode(prefersDark);
-  }, []);
 
   useEffect(() => {
     // Apply dark mode class to document
@@ -196,6 +219,8 @@ export default function PlaygroundPage() {
   }, [darkMode]);
 
   const { register, control, handleSubmit, setValue } = useForm<FormData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(formSchema) as any,
     defaultValues,
   });
 
@@ -235,10 +260,6 @@ export default function PlaygroundPage() {
 
       const json: ApiResult = await response.json();
       setResult(json);
-
-      // Store experimental points for charts
-      setExperimentalPoints(transformedData.experimentalPoints);
-
       setActiveTab("results");
     } catch {
       setResult({
@@ -272,11 +293,11 @@ export default function PlaygroundPage() {
         <div className="container mx-auto px-4 py-4 max-w-6xl flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              className={`w-10 h-10 rounded-lg flex items-center justify-center text-white ${
                 darkMode ? "bg-emerald-600" : "bg-emerald-500"
               }`}
             >
-              <span className="text-white font-bold text-lg">IP</span>
+              <ConcreteIcon />
             </div>
             <div>
               <h1
@@ -768,7 +789,7 @@ export default function PlaygroundPage() {
                 )}
 
                 {/* Traço Unitário */}
-                <Card className="bg-gradient-to-br from-emerald-500 to-teal-600 border-0">
+                <Card className="bg-linear-to-br from-emerald-500 to-teal-600 border-0">
                   <CardHeader>
                     <CardTitle className="text-white">
                       Traço Unitário Final
@@ -816,7 +837,7 @@ export default function PlaygroundPage() {
                   ].map((item) => (
                     <Card
                       key={item.label}
-                      className={`bg-gradient-to-br ${item.color} border-0`}
+                      className={`bg-linear-to-br ${item.color} border-0`}
                     >
                       <CardContent className="p-4 text-center">
                         <p className="text-sm text-white/80">{item.label}</p>
