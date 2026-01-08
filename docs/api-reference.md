@@ -265,3 +265,30 @@ data = response.json()
 print(f"Traço: 1 : {data['data']['finalTrace']['sand']:.2f} : {data['data']['finalTrace']['gravel']:.2f}")
 # Traço: 1 : 1.56 : 2.36
 ```
+
+---
+
+## Testing
+
+For comprehensive API testing documentation, including test cases, assertions, and coverage details, see:
+
+📋 **[API Testing Documentation](./api-testing.md)**
+
+### Quick Test Commands
+
+```bash
+# Run API integration tests
+npm run test:api
+
+# Ensure dev server is running first
+npm run dev
+```
+
+### Test Coverage
+
+| Category          | Tests |
+| ----------------- | ----- |
+| Health Check      | 1     |
+| Happy Path        | 1     |
+| Validation Errors | 2     |
+| **Total**         | **4** |
