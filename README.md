@@ -102,19 +102,19 @@ The IPT/EPUSP method uses three experimental traces (Rich, Pilot, Lean) to deter
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │   INPUT: 3 Experimental Traces                              │
-│   Rico:   m=3.5, a/c=0.45, fcj=42 MPa                      │
-│   Piloto: m=5.0, a/c=0.58, fcj=32 MPa                      │
-│   Pobre:  m=6.5, a/c=0.72, fcj=22 MPa                      │
+│   Rico:   m=3.5, a/c=0.45, fcj=42 MPa                       │
+│   Piloto: m=5.0, a/c=0.58, fcj=32 MPa                       │
+│   Pobre:  m=6.5, a/c=0.72, fcj=22 MPa                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│   1️⃣ Abrams Law: fcj = k₁ / k₂^(a/c) → target a/c         │
-│   2️⃣ Lyse Law:   m = k₃ + k₄ × (a/c) → target m           │
-│   3️⃣ Molinari:   C = 1000 / (k₅ + k₆ × m) → cement kg/m³  │
+│   1️⃣ Abrams Law: fcj = k₁ / k₂^(a/c) → target a/c           │
+│   2️⃣ Lyse Law:   m = k₃ + k₄ × (a/c) → target m             │
+│   3️⃣ Molinari:   C = 1000 / (k₅ + k₆ × m) → cement kg/m³    │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
 │   OUTPUT: Final Unit Trace                                  │
-│   1 : 1.56 : 2.36 : 0.49                                   │
-│   (cement : sand : gravel : water)                         │
+│   1 : 1.56 : 2.36 : 0.49                                    │
+│   (cement : sand : gravel : water)                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -212,11 +212,11 @@ Access the interactive playground at `http://localhost:3000`:
 
 ### Normative Documents
 
-| Standard       | Title                             | Link                                              |
-| -------------- | --------------------------------- | ------------------------------------------------- |
-| NBR 6118:2023  | Projeto de estruturas de concreto | [ABNT Catálogo](https://www.abntcatalogo.com.br/) |
-| NBR 12655:2022 | Concreto - Preparo e controle     | [ABNT Catálogo](https://www.abntcatalogo.com.br/) |
-| NBR 8953:2015  | Classificação do concreto         | [ABNT Catálogo](https://www.abntcatalogo.com.br/) |
+| Standard       | Title                             |
+| -------------- | --------------------------------- |
+| NBR 6118:2023  | Projeto de estruturas de concreto |
+| NBR 12655:2022 | Concreto - Preparo e controle     |
+| NBR 8953:2015  | Classificação do concreto         |
 
 ### Technical Resources
 
