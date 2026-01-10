@@ -101,6 +101,12 @@ Yes! The regression will be fitted using all provided points. More points genera
 | Cement consumption  | kg/m³ |
 | Water consumption   | L/m³  |
 
+### Why doesn't the Slump value affect the results?
+
+In the pure IPT/EPUSP method, the experimental points (Rich, Pilot, Lean) are produced with the **same target slump** as the final project. Therefore, the water-cement ratio (a/c) and cement consumption (C) derived from these points already inherently include the water demand required to achieve that slump.
+
+If you need to correct for a different slump, you should ideally perform new experimental mixes. The API receives the `slump` parameter for documentation and compliance checking purposes, but it does not apply artificial mathematical corrections to the water consumption, preserving the empirical nature of the method.
+
 ### How do I interpret the finalTrace?
 
 The final trace is expressed as unit proportions relative to cement:

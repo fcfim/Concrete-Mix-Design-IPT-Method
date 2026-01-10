@@ -57,6 +57,30 @@ export const dosageTargetSchema = z.object({
 });
 
 /**
+ * Schema para configuração de recipiente/betoneira
+ */
+export const containerConfigSchema = z
+  .object({
+    shape: z.enum(["rectangular", "circular"]),
+    length: z.number().positive("Comprimento/diâmetro deve ser positivo"),
+    width: z.number().positive("Largura deve ser positiva").optional(),
+    height: z.number().positive("Altura deve ser positiva"),
+    totalVolume: z.number().positive("Volume total deve ser positivo"),
+  })
+  .optional();
+
+/**
+ * Schema para configuração de arredondamento de obra
+ */
+export const roundingConfigSchema = z
+  .object({
+    waterIncrement: z.union([z.literal(1), z.literal(5), z.literal(10)]),
+    cementIncrement: z.union([z.literal(1), z.literal(5), z.literal(50)]),
+    aggregateIncrement: z.union([z.literal(1), z.literal(5)]),
+  })
+  .optional();
+
+/**
  * Schema completo para entrada da API
  */
 export const dosageInputSchema = z.object({
@@ -68,6 +92,10 @@ export const dosageInputSchema = z.object({
     )
     .max(10, "Máximo de 10 pontos experimentais"),
   target: dosageTargetSchema,
+  /** Configuração opcional de arredondamento para valores de obra */
+  roundingConfig: roundingConfigSchema,
+  /** Configuração opcional de recipiente para cálculo de batches */
+  containerConfig: containerConfigSchema,
 });
 
 /**

@@ -23,14 +23,15 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import DosageCharts from "@/components/dosage-charts";
+import UnifiedIPTDiagram from "@/components/unified-ipt-diagram";
 
 // --- ICONS ---
 function ConcreteIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="1em"
-      height="1em"
+      width="24"
+      height="24"
       viewBox="0 0 24 24"
     >
       <g
@@ -38,6 +39,7 @@ function ConcreteIcon() {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth="1.5"
       >
         <path d="M11.66 12a3.83 3.83 0 1 1-3.26-6.42" />
         <path d="M12.9 6.88a4.57 4.57 0 0 1 .59 6.33" />
@@ -155,6 +157,18 @@ const formSchema = z.object({
     slump: z.coerce.number().min(0).max(250),
     mortarContent: z.coerce.number().min(40).max(65),
   }),
+  containerConfig: z
+    .object({
+      enabled: z.boolean(),
+      shape: z.enum(["rectangular", "circular"]),
+      // Dimensions in centimeters for easier input (bucket, can, etc.)
+      lengthCm: z.coerce.number().positive().optional(),
+      widthCm: z.coerce.number().positive().optional(),
+      heightCm: z.coerce.number().positive().optional(),
+      // Total concrete volume desired in m³
+      concreteVolume: z.coerce.number().positive().optional(),
+    })
+    .optional(),
 });
 
 interface FormData {
@@ -172,6 +186,16 @@ interface FormData {
     slump: number;
     mortarContent: number;
   };
+  containerConfig?: {
+    enabled: boolean;
+    shape: "rectangular" | "circular";
+    // Dimensions in centimeters
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+    // Total concrete volume in m³
+    concreteVolume?: number;
+  };
 }
 
 const defaultValues: FormData = {
@@ -187,6 +211,14 @@ const defaultValues: FormData = {
     elementType: "CA",
     slump: 100,
     mortarContent: 49,
+  },
+  containerConfig: {
+    enabled: false,
+    shape: "rectangular",
+    lengthCm: 30, // 30cm = typical bucket diameter or padiola width
+    widthCm: 20, // 20cm
+    heightCm: 25, // 25cm ≈ 15L bucket
+    concreteVolume: 1.0, // 1m³ of concrete
   },
 };
 
@@ -214,6 +246,19 @@ type DosageResult = {
       fcjTarget: number;
       targetAC: number;
       targetM: number;
+    };
+    experimentalRange?: {
+      minFcj: number;
+      maxFcj: number;
+      isExtrapolating: boolean;
+      extrapolationPercent?: number;
+    };
+    batchResult?: {
+      containerVolume: number;
+      totalVolume: number;
+      numberOfBatches: number;
+      perBatch: { cement: number; sand: number; gravel: number; water: number };
+      total: { cement: number; sand: number; gravel: number; water: number };
     };
     warnings: string[];
   };
@@ -266,12 +311,40 @@ export default function PlaygroundPage() {
 
   async function onSubmit(data: FormData) {
     setLoading(true);
-    setResult(null);
+    // setResult(null); // Keep previous result to avoid flicker
     try {
+      // Prepare API payload with optional containerConfig
+      const payload: Record<string, unknown> = {
+        experimentalPoints: data.experimentalPoints,
+        target: data.target,
+      };
+
+      // Add containerConfig only if enabled and has dimensions
+      if (
+        data.containerConfig?.enabled &&
+        data.containerConfig.lengthCm &&
+        data.containerConfig.heightCm &&
+        data.containerConfig.concreteVolume
+      ) {
+        // Convert cm to meters
+        const lengthM = data.containerConfig.lengthCm / 100;
+        const widthM =
+          (data.containerConfig.widthCm || data.containerConfig.lengthCm) / 100;
+        const heightM = data.containerConfig.heightCm / 100;
+
+        payload.containerConfig = {
+          shape: data.containerConfig.shape,
+          length: lengthM,
+          width: widthM,
+          height: heightM,
+          totalVolume: data.containerConfig.concreteVolume,
+        };
+      }
+
       const response = await fetch("/api/v1/dosage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       const json = await response.json();
@@ -675,13 +748,189 @@ export default function PlaygroundPage() {
                 </CardContent>
               </Card>
 
+              {/* Container Configuration (Collapsible) */}
+              <Card
+                className={`border shadow-sm transition-all ${
+                  darkMode
+                    ? "bg-slate-900 border-slate-800 hover:border-slate-700"
+                    : "bg-white border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle
+                        className={`text-lg font-semibold ${
+                          darkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        📦 Cálculo de Betonadas
+                      </CardTitle>
+                      <CardDescription
+                        className={
+                          darkMode ? "text-slate-400" : "text-gray-500"
+                        }
+                      >
+                        Opcional: dimensões do recipiente
+                      </CardDescription>
+                    </div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="w-5 h-5 rounded"
+                        {...register("containerConfig.enabled")}
+                      />
+                      <span
+                        className={`text-sm ${
+                          darkMode ? "text-slate-400" : "text-gray-500"
+                        }`}
+                      >
+                        Ativar
+                      </span>
+                    </label>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label
+                        className={
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }
+                      >
+                        Formato
+                      </Label>
+                      <Select
+                        defaultValue="rectangular"
+                        onValueChange={(v) =>
+                          setValue(
+                            "containerConfig.shape",
+                            v as "rectangular" | "circular"
+                          )
+                        }
+                      >
+                        <SelectTrigger
+                          className={
+                            darkMode
+                              ? "bg-slate-800 border-slate-700 text-white"
+                              : "bg-slate-50 border-slate-300"
+                          }
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rectangular">
+                            Retangular
+                          </SelectItem>
+                          <SelectItem value="circular">Circular</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label
+                        className={
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }
+                      >
+                        Volume de Concreto (m³)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 1.5"
+                        className={
+                          darkMode
+                            ? "bg-slate-800 border-slate-700 text-white"
+                            : "bg-slate-50 border-slate-300"
+                        }
+                        {...register("containerConfig.concreteVolume")}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label
+                        className={
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }
+                      >
+                        Comprimento (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Ex: 30"
+                        className={
+                          darkMode
+                            ? "bg-slate-800 border-slate-700 text-white"
+                            : "bg-slate-50 border-slate-300"
+                        }
+                        {...register("containerConfig.lengthCm")}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label
+                        className={
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }
+                      >
+                        Largura (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Ex: 20"
+                        className={
+                          darkMode
+                            ? "bg-slate-800 border-slate-700 text-white"
+                            : "bg-slate-50 border-slate-300"
+                        }
+                        {...register("containerConfig.widthCm")}
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-1.5">
+                      <Label
+                        className={
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }
+                      >
+                        Altura (cm)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Ex: 25"
+                        className={
+                          darkMode
+                            ? "bg-slate-800 border-slate-700 text-white"
+                            : "bg-slate-50 border-slate-300"
+                        }
+                        {...register("containerConfig.heightCm")}
+                      />
+                      <p
+                        className={`text-xs ${
+                          darkMode ? "text-slate-500" : "text-gray-400"
+                        }`}
+                      >
+                        Volume calculado:{" "}
+                        {(
+                          ((defaultValues.containerConfig?.lengthCm || 30) *
+                            (defaultValues.containerConfig?.widthCm || 20) *
+                            (defaultValues.containerConfig?.heightCm || 25)) /
+                          1000
+                        ).toFixed(1)}
+                        L (padiola/balde)
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Button
                 type="submit"
                 disabled={loading}
                 className={`w-full text-lg py-6 font-semibold shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] ${
                   darkMode
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/30"
+                    ? "bg-slate-700 hover:bg-slate-600 text-white shadow-slate-900/30"
+                    : "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-500/30"
                 }`}
               >
                 {loading ? (
@@ -698,7 +947,7 @@ export default function PlaygroundPage() {
 
           {/* RIGHT COLUMN: Results Dashboard (8 cols) */}
           <div className="lg:col-span-8 space-y-6">
-            {loading ? (
+            {loading && !result ? (
               <div className="space-y-6 animate-pulse">
                 <div
                   className={`h-64 rounded-xl ${
@@ -719,7 +968,13 @@ export default function PlaygroundPage() {
                 </div>
               </div>
             ) : result?.success && result.data ? (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div
+                className={`space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+                  loading
+                    ? "opacity-70 pointer-events-none grayscale-[0.2]"
+                    : ""
+                }`}
+              >
                 {/* Validation Alerts */}
                 {result.data.warnings.length > 0 && (
                   <Alert
@@ -857,11 +1112,11 @@ export default function PlaygroundPage() {
                 </div>
 
                 {/* Main Result: Traço Unitário */}
-                <Card className="overflow-hidden border-0 shadow-lg">
+                <Card className="overflow-hidden border-0 shadow-lg relative">
                   <div
-                    className={`absolute inset-0 opacity-10 bg-[url('https://grain-texture.vercel.app/grain.svg')]`}
+                    className={`absolute inset-0 opacity-10 bg-[url('https://grain-texture.vercel.app/grain.svg')] pointer-events-none`}
                   ></div>
-                  <div className="bg-linear-to-r from-emerald-600 to-teal-600 p-8 text-center relative z-10">
+                  <div className="bg-linear-to-r from-slate-800 to-slate-700 p-8 text-center relative z-10">
                     <h3 className="text-white/90 text-sm font-medium uppercase tracking-widest mb-2">
                       Traço Unitário Final (Em Massa)
                     </h3>
@@ -937,6 +1192,121 @@ export default function PlaygroundPage() {
                   ))}
                 </div>
 
+                {/* Batch Results (when container config provided) */}
+                {result.data.batchResult && (
+                  <Card
+                    className={`border shadow-sm ${
+                      darkMode
+                        ? "bg-slate-900 border-slate-800"
+                        : "bg-white border-gray-200"
+                    }`}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle
+                        className={`text-lg font-semibold ${
+                          darkMode ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        📦 Cálculo de Betonadas
+                      </CardTitle>
+                      <CardDescription
+                        className={
+                          darkMode ? "text-slate-400" : "text-gray-500"
+                        }
+                      >
+                        Volume recipiente:{" "}
+                        {result.data.batchResult.containerVolume.toFixed(4)} m³
+                        {" • "}
+                        Total: {result.data.batchResult.totalVolume} m³
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div
+                          className={`p-4 rounded-lg text-center ${
+                            darkMode ? "bg-slate-800" : "bg-slate-100"
+                          }`}
+                        >
+                          <div
+                            className={`text-2xl font-bold ${
+                              darkMode ? "text-white" : "text-slate-900"
+                            }`}
+                          >
+                            {result.data.batchResult.numberOfBatches}
+                          </div>
+                          <div className="text-xs text-muted-foreground uppercase">
+                            Betonadas
+                          </div>
+                        </div>
+                        <div
+                          className={`p-4 rounded-lg text-center ${
+                            darkMode ? "bg-slate-800" : "bg-blue-50"
+                          }`}
+                        >
+                          <div
+                            className={`text-xl font-bold ${
+                              darkMode ? "text-blue-400" : "text-blue-600"
+                            }`}
+                          >
+                            {result.data.batchResult.perBatch.cement.toFixed(1)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Cimento/batch (kg)
+                          </div>
+                        </div>
+                        <div
+                          className={`p-4 rounded-lg text-center ${
+                            darkMode ? "bg-slate-800" : "bg-amber-50"
+                          }`}
+                        >
+                          <div
+                            className={`text-xl font-bold ${
+                              darkMode ? "text-amber-400" : "text-amber-600"
+                            }`}
+                          >
+                            {result.data.batchResult.perBatch.sand.toFixed(1)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Areia/batch (kg)
+                          </div>
+                        </div>
+                        <div
+                          className={`p-4 rounded-lg text-center ${
+                            darkMode ? "bg-slate-800" : "bg-gray-100"
+                          }`}
+                        >
+                          <div
+                            className={`text-xl font-bold ${
+                              darkMode ? "text-gray-300" : "text-gray-700"
+                            }`}
+                          >
+                            {result.data.batchResult.perBatch.gravel.toFixed(1)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Brita/batch (kg)
+                          </div>
+                        </div>
+                        <div
+                          className={`p-4 rounded-lg text-center ${
+                            darkMode ? "bg-slate-800" : "bg-cyan-50"
+                          }`}
+                        >
+                          <div
+                            className={`text-xl font-bold ${
+                              darkMode ? "text-cyan-400" : "text-cyan-600"
+                            }`}
+                          >
+                            {result.data.batchResult.perBatch.water.toFixed(1)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Água/batch (L)
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Charts Section */}
                 <div className="pt-6 border-t border-dashed border-gray-200 dark:border-slate-800">
                   <h3
@@ -944,15 +1314,50 @@ export default function PlaygroundPage() {
                       darkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Análise Gráfica e Correlações
+                    Diagrama de Dosagem IPT/EPUSP
                   </h3>
-                  <DosageCharts
+
+                  {/* Unified IPT Diagram - Main visualization */}
+                  <UnifiedIPTDiagram
                     experimentalPoints={defaultValues.experimentalPoints}
                     coefficients={result.data.coefficients}
                     parameters={result.data.parameters}
                     cementConsumption={result.data.consumption.cement}
                     darkMode={darkMode}
                   />
+
+                  {/* Separate charts for detailed analysis */}
+                  <details className="mt-6 group">
+                    <summary
+                      className={`cursor-pointer list-none text-sm font-medium ${
+                        darkMode
+                          ? "text-slate-400 hover:text-slate-300"
+                          : "text-gray-600 hover:text-gray-800"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4 transition-transform group-open:rotate-90"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                        Ver gráficos individuais detalhados
+                      </span>
+                    </summary>
+                    <div className="mt-4">
+                      <DosageCharts
+                        experimentalPoints={defaultValues.experimentalPoints}
+                        coefficients={result.data.coefficients}
+                        parameters={result.data.parameters}
+                        cementConsumption={result.data.consumption.cement}
+                        darkMode={darkMode}
+                      />
+                    </div>
+                  </details>
                 </div>
 
                 {/* API Response Section */}

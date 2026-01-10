@@ -18,7 +18,11 @@ import {
   ExperimentalPoint,
   DosageTarget,
   TraceResult,
+  RoundingConfig,
+  MixerContainer,
 } from "../../domain/entities";
+import { FieldRoundingService } from "../../infrastructure/presentation/field-rounding.service";
+import { BatchCalculatorService } from "../../infrastructure/batch/batch-calculator.service";
 import {
   AbramsLawService,
   LyseLawService,
@@ -34,6 +38,13 @@ import {
 export interface DosageInput {
   experimentalPoints: ExperimentalPoint[];
   target: DosageTarget;
+  /** Configuração opcional de arredondamento para valores de obra */
+  roundingConfig?: RoundingConfig;
+  /** Configuração opcional de recipiente para cálculo de batches */
+  containerConfig?: {
+    container: MixerContainer;
+    totalVolume: number;
+  };
 }
 
 export class CalculateDosageUseCase {
@@ -44,13 +55,25 @@ export class CalculateDosageUseCase {
    * @returns Resultado completo da dosagem
    */
   execute(input: DosageInput): TraceResult {
-    const { experimentalPoints, target } = input;
+    const { experimentalPoints, target, roundingConfig, containerConfig } =
+      input;
     const warnings: string[] = [];
 
     // 1. Validar quantidade de pontos
     if (experimentalPoints.length < 3) {
       throw new Error(
         "São necessários pelo menos 3 pontos experimentais (Rico, Piloto, Pobre)"
+      );
+    }
+
+    // 1.1 Verificar se densidades parecem teóricas (ar aprisionado não considerado)
+    const avgDensity =
+      experimentalPoints.reduce((s, p) => s + p.density, 0) /
+      experimentalPoints.length;
+    if (avgDensity > 2450) {
+      warnings.push(
+        `ℹ️ Densidade média (${avgDensity.toFixed(0)} kg/m³) é alta. ` +
+          `Verifique se as densidades são experimentais (com ar incorporado) ou teóricas.`
       );
     }
 
@@ -76,6 +99,30 @@ export class CalculateDosageUseCase {
     const lyseCoeffs = LyseLawService.calculateCoefficients(experimentalPoints);
     const molinariCoeffs =
       MolinariLawService.calculateCoefficients(experimentalPoints);
+
+    // 4.1 Validar extrapolação - extrair range experimental
+    const fcjValues = experimentalPoints.map((p) => p.fcj);
+    const minFcj = Math.min(...fcjValues);
+    const maxFcj = Math.max(...fcjValues);
+    const isExtrapolating = fcjTarget < minFcj || fcjTarget > maxFcj;
+    let extrapolationPercent: number | undefined;
+
+    if (isExtrapolating) {
+      const distance =
+        fcjTarget < minFcj
+          ? ((minFcj - fcjTarget) / minFcj) * 100
+          : ((fcjTarget - maxFcj) / maxFcj) * 100;
+      extrapolationPercent = this.round(distance, 1);
+      warnings.push(
+        `⚠️ EXTRAPOLAÇÃO: fcj alvo (${fcjTarget.toFixed(
+          1
+        )} MPa) está ${extrapolationPercent}% ` +
+          `fora do intervalo experimental [${minFcj.toFixed(
+            1
+          )}-${maxFcj.toFixed(1)} MPa]. ` +
+          `Resultado pode ser impreciso.`
+      );
+    }
 
     // 5. Determinar a/c para resistência alvo (Lei de Abrams inversa)
     let targetAC = AbramsLawService.calculateTargetAC(fcjTarget, abramsCoeffs);
@@ -131,6 +178,8 @@ export class CalculateDosageUseCase {
     }
 
     // 11. Calcular consumos dos demais materiais
+    // Método IPT puro: água = a/c × C (derivado dos ensaios experimentais)
+    // Os pontos experimentais já refletem o slump desejado
     const sandConsumption = sand * cementConsumption;
     const gravelConsumption = gravel * cementConsumption;
     const waterConsumption = targetAC * cementConsumption;
@@ -159,6 +208,37 @@ export class CalculateDosageUseCase {
         lyse: lyseCoeffs,
         molinari: molinariCoeffs,
       },
+      experimentalRange: {
+        minFcj: this.round(minFcj, 1),
+        maxFcj: this.round(maxFcj, 1),
+        isExtrapolating,
+        ...(extrapolationPercent !== undefined && { extrapolationPercent }),
+      },
+      // Campo opcional: consumo arredondado para obra
+      ...(roundingConfig && {
+        fieldConsumption: FieldRoundingService.round(
+          {
+            cement: cementConsumption,
+            sand: sandConsumption,
+            gravel: gravelConsumption,
+            water: waterConsumption,
+          },
+          roundingConfig
+        ),
+      }),
+      // Campo opcional: cálculo de batches para recipiente
+      ...(containerConfig && {
+        batchResult: BatchCalculatorService.calculate(
+          {
+            cement: cementConsumption,
+            sand: sandConsumption,
+            gravel: gravelConsumption,
+            water: waterConsumption,
+          },
+          containerConfig.container,
+          containerConfig.totalVolume
+        ),
+      }),
       warnings,
     };
 

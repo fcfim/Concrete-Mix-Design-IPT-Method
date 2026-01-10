@@ -66,7 +66,7 @@ Where:
 
 ```
 fcj (MPa)
-│
+  │
 60┤ ●                      Rico (high strength)
   │  ╲
 50┤   ╲

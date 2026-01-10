@@ -50,6 +50,51 @@ export interface TraceResult {
     molinari: { k5: number; k6: number; r2: number };
   };
 
+  /** Faixa dos pontos experimentais para validação de extrapolação */
+  experimentalRange: {
+    /** Menor fcj experimental (MPa) */
+    minFcj: number;
+    /** Maior fcj experimental (MPa) */
+    maxFcj: number;
+    /** True se fcjTarget está fora do range experimental */
+    isExtrapolating: boolean;
+    /** Distância percentual fora do range (se extrapolando) */
+    extrapolationPercent?: number;
+  };
+
+  /** Consumo arredondado para obra (opcional, se RoundingConfig fornecido) */
+  fieldConsumption?: {
+    cement: number;
+    sand: number;
+    gravel: number;
+    water: number;
+    cementBags?: number;
+  };
+
+  /** Resultado do cálculo de batches (opcional, se ContainerConfig fornecido) */
+  batchResult?: {
+    /** Volume do recipiente (m³) */
+    containerVolume: number;
+    /** Volume total desejado (m³) */
+    totalVolume: number;
+    /** Número de batches necessários */
+    numberOfBatches: number;
+    /** Material por batch */
+    perBatch: {
+      cement: number;
+      sand: number;
+      gravel: number;
+      water: number;
+    };
+    /** Material total */
+    total: {
+      cement: number;
+      sand: number;
+      gravel: number;
+      water: number;
+    };
+  };
+
   /** Avisos não-bloqueantes (ex: limites normativos aplicados) */
   warnings: string[];
 }

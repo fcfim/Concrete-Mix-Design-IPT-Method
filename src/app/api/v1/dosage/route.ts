@@ -71,7 +71,23 @@ export async function POST(request: Request) {
 
     // 3. Executar cálculo
     const useCase = new CalculateDosageUseCase();
-    const result = useCase.execute({ experimentalPoints, target });
+    const result = useCase.execute({
+      experimentalPoints,
+      target,
+      roundingConfig: validated.roundingConfig,
+      // Converter containerConfig do schema para formato do use case
+      ...(validated.containerConfig && {
+        containerConfig: {
+          container: {
+            shape: validated.containerConfig.shape,
+            length: validated.containerConfig.length,
+            width: validated.containerConfig.width,
+            height: validated.containerConfig.height,
+          },
+          totalVolume: validated.containerConfig.totalVolume,
+        },
+      }),
+    });
 
     // 4. Retornar resposta de sucesso
     return NextResponse.json(
