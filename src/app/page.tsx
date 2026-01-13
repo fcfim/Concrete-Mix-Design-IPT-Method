@@ -1,10 +1,32 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import DosageCharts from "@/components/dosage-charts";
+import UnifiedIPTDiagram from "@/components/unified-ipt-diagram";
 import {
   Calculator,
   CheckCircle2,
-  ChevronRight,
   Construction,
   FlaskConical,
   Layers,
@@ -15,263 +37,444 @@ import {
   Scale,
   TrendingUp,
   AlertCircle,
-  Download,
-  Printer,
+  ChevronRight,
 } from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  Legend,
-} from "recharts";
 import { cn } from "@/lib/utils";
 
-// --- Domain Interfaces ---
-interface ConcreteMaterials {
-  cement: { type: string; density: number; f28: number };
-  sand: { modulus: number; density: number; unitMass: number };
-  gravel: { maxDiameter: number; density: number; unitMass: number };
-}
-
-interface TargetParameters {
-  fck: number;
-  standardDeviation: number;
-  slump: number;
-}
-
-interface MixResult {
-  trace: { cement: number; sand: number; gravel: number; water: number };
-  consumption: { cement: number; sand: number; gravel: number; water: number };
-  ratio: string;
-}
-
-// --- Mock Data & Calculation Logic (Client-Side Simulation) ---
-const SIMULATE_CALCULATION = (
-  target: TargetParameters,
-  materials: ConcreteMaterials
-): MixResult => {
-  const fcj = target.fck + 1.65 * target.standardDeviation;
-  const wcRatio = Math.max(
-    0.3,
-    Math.min(0.8, (Math.log(68) - Math.log(fcj)) / Math.log(11))
+// --- ICONS ---
+function ConcreteIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+    >
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      >
+        <path d="M11.66 12a3.83 3.83 0 1 1-3.26-6.42" />
+        <path d="M12.9 6.88a4.57 4.57 0 0 1 .59 6.33" />
+        <path d="M12.63 15.11a7.1 7.1 0 0 1-8.12-8.57" />
+        <path d="M4.51 6.54A7.43 7.43 0 0 1 12 4.5" />
+        <path d="M15.82 9.09a3.83 3.83 0 1 1-3.26 6.42" />
+        <path d="M12 18.25a4.57 4.57 0 0 1-2.92-1.07" />
+        <path d="m11.37 8.89l8.12 8.57" />
+        <path d="M19.49 17.46A7.43 7.43 0 0 1 12 19.5" />
+      </g>
+    </svg>
   );
+}
 
-  let waterContent = 205;
-  if (target.slump > 100) waterContent += 10;
-  if (materials.gravel.maxDiameter > 25) waterContent -= 15;
+function GitHubIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+    </svg>
+  );
+}
 
-  const cementConsumption = waterContent / wcRatio;
-  const volumeCement = cementConsumption / materials.cement.density;
-  const volumeWater = waterContent;
-  const volumeAggregates = 1000 - volumeCement - volumeWater;
-  const idealSandPercent = 0.45;
+function LinkedInIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+      <rect x="2" y="9" width="4" height="12" />
+      <circle cx="4" cy="4" r="2" />
+    </svg>
+  );
+}
 
-  const volumeSand = volumeAggregates * idealSandPercent;
-  const volumeGravel = volumeAggregates * (1 - idealSandPercent);
+function MoonIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
 
-  const sandConsumption = volumeSand * materials.sand.density;
-  const gravelConsumption = volumeGravel * materials.gravel.density;
+function SunIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  );
+}
 
-  const a = sandConsumption / cementConsumption;
-  const p = gravelConsumption / cementConsumption;
-  const wc = wcRatio;
+// --- TYPES & SCHEMA ---
 
-  return {
-    trace: { cement: 1, sand: a, gravel: p, water: wc },
+const formSchema = z.object({
+  experimentalPoints: z
+    .array(
+      z.object({
+        m: z.coerce.number().positive(),
+        ac: z.coerce.number().positive().max(1),
+        fcj: z.coerce.number().positive(),
+        density: z.coerce.number().min(1500).max(3000),
+      })
+    )
+    .min(3),
+  target: z.object({
+    fck: z.coerce.number().min(10).max(100),
+    sd: z.coerce.number().min(2).max(10),
+    aggressivenessClass: z.coerce.number().min(1).max(4),
+    elementType: z.enum(["CA", "CP"]),
+    slump: z.coerce.number().min(0).max(250),
+    mortarContent: z.coerce.number().min(40).max(65),
+  }),
+  containerConfig: z
+    .object({
+      enabled: z.boolean(),
+      shape: z.enum(["rectangular", "circular"]),
+      lengthCm: z.coerce.number().positive().optional(),
+      widthCm: z.coerce.number().positive().optional(),
+      heightCm: z.coerce.number().positive().optional(),
+      concreteVolume: z.coerce.number().positive().optional(),
+    })
+    .optional(),
+});
+
+interface FormData {
+  experimentalPoints: {
+    m: number;
+    ac: number;
+    fcj: number;
+    density: number;
+  }[];
+  target: {
+    fck: number;
+    sd: number;
+    aggressivenessClass: number;
+    elementType: "CA" | "CP";
+    slump: number;
+    mortarContent: number;
+  };
+  containerConfig?: {
+    enabled: boolean;
+    shape: "rectangular" | "circular";
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+    concreteVolume?: number;
+  };
+}
+
+const defaultValues: FormData = {
+  experimentalPoints: [
+    { m: 3.5, ac: 0.38, fcj: 48.3, density: 2470 },
+    { m: 5.0, ac: 0.53, fcj: 32.1, density: 2390 },
+    { m: 6.5, ac: 0.69, fcj: 19.8, density: 2280 },
+  ],
+  target: {
+    fck: 30,
+    sd: 4,
+    aggressivenessClass: 2,
+    elementType: "CA",
+    slump: 100,
+    mortarContent: 49,
+  },
+  containerConfig: {
+    enabled: false,
+    shape: "rectangular",
+    lengthCm: 30,
+    widthCm: 20,
+    heightCm: 25,
+    concreteVolume: 1.0,
+  },
+};
+
+type DosageResult = {
+  success: boolean;
+  data?: {
+    finalTrace: {
+      sand: number;
+      gravel: number;
+      water: number;
+      ratio: string;
+    };
     consumption: {
-      cement: Math.round(cementConsumption),
-      sand: Math.round(sandConsumption),
-      gravel: Math.round(gravelConsumption),
-      water: Math.round(waterContent),
-    },
-    ratio: `1 : ${a.toFixed(2)} : ${p.toFixed(2)} : ${wc.toFixed(2)}`,
+      cement: number;
+      sand: number;
+      gravel: number;
+      water: number;
+    };
+    coefficients: {
+      abrams: { k1: number; k2: number; r2: number };
+      lyse: { k3: number; k4: number; r2: number };
+      molinari: { k5: number; k6: number; r2: number };
+    };
+    parameters: {
+      fcjTarget: number;
+      targetAC: number;
+      targetM: number;
+    };
+    experimentalRange?: {
+      minFcj: number;
+      maxFcj: number;
+      isExtrapolating: boolean;
+      extrapolationPercent?: number;
+    };
+    batchResult?: {
+      containerVolume: number;
+      totalVolume: number;
+      numberOfBatches: number;
+      perBatch: { cement: number; sand: number; gravel: number; water: number };
+      total: { cement: number; sand: number; gravel: number; water: number };
+    };
+    warnings: string[];
+  };
+  error?: {
+    code: string;
+    message: string;
+    details?: { path: string[]; message: string }[];
   };
 };
 
-// --- UI Components ---
-
-const Card = ({
-  children,
-  className,
-  hover = false,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  hover?: boolean;
-}) => (
-  <div
-    className={cn(
-      "bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 shadow-xl",
-      hover &&
-        "hover:border-amber-500/50 hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300",
-      className
-    )}
-  >
-    {children}
-  </div>
-);
-
-const Label = ({ children }: { children: React.ReactNode }) => (
-  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2 ml-1">
-    {children}
-  </label>
-);
-
-const Input = ({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
-  <input
-    className="w-full bg-zinc-950/50 border border-zinc-800 text-zinc-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all placeholder:text-zinc-700"
-    {...props}
-  />
-);
-
-const Select = ({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) => (
-  <div className="relative">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-zinc-950/50 border border-zinc-800 text-zinc-100 rounded-lg px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all cursor-pointer"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
-    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
-      <ChevronRight className="w-4 h-4 rotate-90" />
-    </div>
-  </div>
-);
-
+// --- Step Indicator Component ---
 const StepIndicator = ({
   current,
   total,
+  darkMode,
 }: {
   current: number;
   total: number;
+  darkMode: boolean;
 }) => (
-  <div className="flex items-center space-x-2 mb-8">
+  <div className="flex items-center space-x-2 mb-6">
     {Array.from({ length: total }).map((_, i) => (
       <div
         key={i}
         className={cn(
           "h-2 rounded-full transition-all duration-500",
           i + 1 === current
-            ? "w-12 bg-amber-500"
+            ? darkMode
+              ? "w-12 bg-emerald-500"
+              : "w-12 bg-emerald-600"
             : i + 1 < current
-            ? "w-4 bg-amber-500/40"
-            : "w-2 bg-zinc-800"
+            ? darkMode
+              ? "w-4 bg-emerald-500/40"
+              : "w-4 bg-emerald-600/40"
+            : darkMode
+            ? "w-2 bg-slate-700"
+            : "w-2 bg-gray-300"
         )}
       />
     ))}
-    <span className="ml-auto text-xs font-medium text-zinc-500">
+    <span
+      className={cn(
+        "ml-auto text-xs font-medium",
+        darkMode ? "text-slate-500" : "text-gray-500"
+      )}
+    >
       Passo {current} de {total}
     </span>
   </div>
 );
 
-// --- Main Page Component ---
+// --- COMPONENT ---
 
-export default function ConcreteMixPage() {
-  const [mounted, setMounted] = useState(false);
+export default function PlaygroundPage() {
+  const [result, setResult] = useState<DosageResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [step, setStep] = useState(1);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [result, setResult] = useState<MixResult | null>(null);
-  const [showExportToast, setShowExportToast] = useState(false);
-
-  const [target, setTarget] = useState<TargetParameters>({
-    fck: 25,
-    standardDeviation: 4.0,
-    slump: 100,
-  });
-
-  const [materials, setMaterials] = useState<ConcreteMaterials>({
-    cement: { type: "CP II-E-32", density: 3.1, f28: 32 },
-    sand: { modulus: 2.4, density: 2.65, unitMass: 1.55 },
-    gravel: { maxDiameter: 19, density: 2.7, unitMass: 1.45 },
-  });
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
-  const handleCalculate = async () => {
-    setIsCalculating(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    const data = SIMULATE_CALCULATION(target, materials);
-    setResult(data);
-    setIsCalculating(false);
-    setStep(3);
-  };
+  const { register, control, handleSubmit, setValue, watch } =
+    useForm<FormData>({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      resolver: zodResolver(formSchema) as any,
+      defaultValues,
+    });
 
-  const handleExport = () => {
-    setShowExportToast(true);
-    setTimeout(() => setShowExportToast(false), 3000);
-  };
+  const { fields } = useFieldArray({
+    control,
+    name: "experimentalPoints",
+  });
 
-  const volumeData = useMemo(() => {
-    if (!result) return [];
-    return [
-      { name: "Cimento", value: result.consumption.cement, color: "#f59e0b" },
-      { name: "Areia", value: result.consumption.sand, color: "#fbbf24" },
-      { name: "Brita", value: result.consumption.gravel, color: "#71717a" },
-      { name: "Água", value: result.consumption.water, color: "#3b82f6" },
-    ];
-  }, [result]);
+  const traceLabels = ["Rico", "Piloto", "Pobre"];
+  const experimentalPoints = watch("experimentalPoints");
+  const target = watch("target");
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-mono">
-        Carregando Interface Enterprise...
-      </div>
-    );
+  async function onSubmit(data: FormData) {
+    setLoading(true);
+    try {
+      const payload: Record<string, unknown> = {
+        experimentalPoints: data.experimentalPoints,
+        target: data.target,
+      };
+
+      if (
+        data.containerConfig?.enabled &&
+        data.containerConfig.lengthCm &&
+        data.containerConfig.heightCm &&
+        data.containerConfig.concreteVolume
+      ) {
+        const lengthM = data.containerConfig.lengthCm / 100;
+        const widthM =
+          (data.containerConfig.widthCm || data.containerConfig.lengthCm) / 100;
+        const heightM = data.containerConfig.heightCm / 100;
+
+        payload.containerConfig = {
+          shape: data.containerConfig.shape,
+          length: lengthM,
+          width: widthM,
+          height: heightM,
+          totalVolume: data.containerConfig.concreteVolume,
+        };
+      }
+
+      const response = await fetch("/api/v1/dosage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await response.json();
+      setResult(json);
+      if (json.success) {
+        setStep(3);
+      }
+    } catch (error) {
+      console.error("Erro ao enviar formulário:", error);
+      setResult({
+        success: false,
+        error: {
+          code: "NETWORK_ERROR",
+          message:
+            "Não foi possível conectar ao servidor. Verifique se a API está rodando.",
+        },
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-amber-500/30 overflow-x-hidden">
-      {/* Toast Notification */}
-      <div
-        className={cn(
-          "fixed top-4 right-4 z-50 bg-zinc-800 text-white px-6 py-4 rounded-xl shadow-2xl border border-zinc-700 flex items-center gap-3 transition-all duration-500 transform",
-          showExportToast
-            ? "translate-y-0 opacity-100"
-            : "-translate-y-24 opacity-0"
-        )}
-      >
-        <CheckCircle2 className="text-green-500 w-6 h-6" />
-        <div>
-          <h4 className="font-bold text-sm">Relatório Exportado</h4>
-          <p className="text-xs text-zinc-400">PDF gerado com sucesso.</p>
-        </div>
-      </div>
+  // Theme-based colors
+  const colors = {
+    bg: darkMode ? "bg-slate-950" : "bg-gray-50",
+    cardBg: darkMode
+      ? "bg-slate-900 border-slate-800"
+      : "bg-white border-gray-200",
+    cardHover: darkMode ? "hover:border-slate-700" : "hover:border-gray-300",
+    text: darkMode ? "text-white" : "text-gray-900",
+    textMuted: darkMode ? "text-slate-400" : "text-gray-500",
+    inputBg: darkMode
+      ? "bg-slate-800 border-slate-700 text-white"
+      : "bg-white border-gray-200 text-gray-900",
+    accent: darkMode ? "bg-emerald-600" : "bg-emerald-500",
+    accentText: darkMode ? "text-emerald-400" : "text-emerald-700",
+    sidebarBg: darkMode
+      ? "bg-slate-950/80 border-slate-800"
+      : "bg-white/80 border-gray-200",
+  };
 
+  return (
+    <div
+      className={cn("min-h-screen transition-colors duration-300", colors.bg)}
+    >
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-500/5 blur-[120px] rounded-full" />
+        <div
+          className={cn(
+            "absolute top-[-10%] left-[-10%] w-[40%] h-[40%] blur-[120px] rounded-full",
+            darkMode ? "bg-emerald-500/5" : "bg-emerald-500/10"
+          )}
+        />
+        <div
+          className={cn(
+            "absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] blur-[120px] rounded-full",
+            darkMode ? "bg-blue-500/5" : "bg-blue-500/10"
+          )}
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row min-h-screen relative z-10">
         {/* Sidebar / Navigation */}
-        <aside className="lg:w-72 border-r border-zinc-800 bg-zinc-950/80 backdrop-blur-md p-6 flex-col justify-between hidden lg:flex fixed h-full z-20">
+        <aside
+          className={cn(
+            "lg:w-72 border-r backdrop-blur-md p-6 flex-col justify-between hidden lg:flex fixed h-full z-20",
+            colors.sidebarBg
+          )}
+        >
           <div>
             <div className="flex items-center gap-3 mb-10 px-2">
-              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-                <Construction className="text-zinc-950 w-6 h-6" />
+              <div
+                className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg",
+                  colors.accent,
+                  darkMode ? "shadow-emerald-900/20" : "shadow-emerald-500/20"
+                )}
+              >
+                <ConcreteIcon />
               </div>
               <div>
-                <h1 className="font-bold text-lg leading-tight">Método IPT</h1>
-                <p className="text-xs text-zinc-500">Design de Concreto</p>
+                <h1
+                  className={cn("font-bold text-lg leading-tight", colors.text)}
+                >
+                  Dosagem IPT/EPUSP
+                </h1>
+                <p className={cn("text-xs", colors.textMuted)}>
+                  Calculadora de Concreto
+                </p>
               </div>
             </div>
 
@@ -291,16 +494,24 @@ export default function ConcreteMixPage() {
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all group",
                     item.active
-                      ? "bg-amber-500/10 text-amber-500"
-                      : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+                      ? darkMode
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : "bg-emerald-500/10 text-emerald-700"
+                      : darkMode
+                      ? "text-slate-400 hover:bg-slate-900 hover:text-white"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                   )}
                 >
                   <item.icon
                     className={cn(
                       "w-5 h-5",
                       item.active
-                        ? "text-amber-500"
-                        : "text-zinc-500 group-hover:text-zinc-300"
+                        ? darkMode
+                          ? "text-emerald-400"
+                          : "text-emerald-600"
+                        : darkMode
+                        ? "text-slate-500 group-hover:text-slate-300"
+                        : "text-gray-400 group-hover:text-gray-600"
                     )}
                   />
                   {item.label}
@@ -309,491 +520,977 @@ export default function ConcreteMixPage() {
             </nav>
           </div>
 
-          <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 text-amber-500 mb-2">
+          <div className={cn("rounded-xl p-4 border", colors.cardBg)}>
+            <div
+              className={cn("flex items-center gap-2 mb-2", colors.accentText)}
+            >
               <Activity className="w-4 h-4" />
               <span className="text-xs font-bold uppercase">
                 Status do Sistema
               </span>
             </div>
-            <p className="text-xs text-zinc-500">
+            <p className={cn("text-xs", colors.textMuted)}>
               Biblioteca IPT v2.4 Carregada
             </p>
           </div>
         </aside>
 
         {/* Mobile Nav Header */}
-        <header className="lg:hidden p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/90 backdrop-blur sticky top-0 z-30">
+        <header
+          className={cn(
+            "lg:hidden p-4 border-b flex items-center justify-between backdrop-blur sticky top-0 z-30",
+            darkMode
+              ? "border-slate-800 bg-slate-950/90"
+              : "border-gray-200 bg-white/90"
+          )}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-              <Construction className="text-zinc-950 w-5 h-5" />
+            <div
+              className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center text-white",
+                colors.accent
+              )}
+            >
+              <Construction className="w-5 h-5" />
             </div>
-            <span className="font-bold">IPT Design</span>
+            <span className={cn("font-bold", colors.text)}>IPT Design</span>
           </div>
-          <button className="text-zinc-400">
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={cn(
+                "p-2 rounded-lg transition-all duration-200",
+                darkMode
+                  ? "bg-slate-800 text-yellow-400 hover:bg-slate-700"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              )}
+            >
+              {darkMode ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button className={colors.textMuted}>
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 lg:ml-72 p-6 lg:p-12 overflow-y-auto">
-          <div className="max-w-6xl mx-auto">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+        <main className="flex-1 lg:ml-72 p-6 lg:p-8 overflow-y-auto">
+          <div className="max-w-[1400px] mx-auto">
+            {/* Header */}
+            <div
+              className={cn(
+                "border-b pb-4 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4",
+                darkMode ? "border-slate-800" : "border-gray-200"
+              )}
+            >
               <div>
-                <h2 className="text-3xl font-bold text-zinc-100 mb-2">
+                <h2 className={cn("text-2xl font-bold mb-1", colors.text)}>
                   Novo Design de Traço
                 </h2>
-                <p className="text-zinc-400">
+                <p className={colors.textMuted}>
                   Configure os parâmetros para o método de dosagem experimental
-                  IPT (ABC).
+                  IPT/EPUSP.
                 </p>
               </div>
-              <div className="flex gap-2">
-                {result && (
-                  <button
+              <div className="flex items-center gap-2">
+                <a
+                  href="https://github.com/fcfim/Concrete-Mix-Design-IPT-Method"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    darkMode
+                      ? "hover:bg-slate-800 text-slate-400 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-500 hover:text-gray-900"
+                  )}
+                >
+                  <GitHubIcon />
+                </a>
+                <a
+                  href="https://linkedin.com/in/filipefim"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    darkMode
+                      ? "hover:bg-slate-800 text-slate-400 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-500 hover:text-gray-900"
+                  )}
+                >
+                  <LinkedInIcon />
+                </a>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all duration-200 hidden lg:block",
+                    darkMode
+                      ? "bg-slate-800 text-yellow-400 hover:bg-slate-700"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  )}
+                >
+                  {darkMode ? <SunIcon /> : <MoonIcon />}
+                </button>
+                {result?.success && (
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setStep(1);
                       setResult(null);
                     }}
-                    className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium transition-colors"
+                    className={darkMode ? "border-slate-700" : ""}
                   >
                     Resetar
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left Column: Inputs (Wizard) */}
-              <div className="lg:col-span-7 space-y-6">
-                <StepIndicator current={step} total={3} />
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="grid lg:grid-cols-12 gap-6 items-start">
+                {/* LEFT COLUMN: Input Form */}
+                <div className="lg:col-span-5 space-y-6">
+                  <StepIndicator current={step} total={3} darkMode={darkMode} />
 
-                {/* STEP 1: TARGET PARAMETERS */}
-                {step === 1 && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
-                    <Card hover>
-                      <div className="flex items-center gap-3 mb-6 border-b border-zinc-800 pb-4">
-                        <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
-                          <CheckCircle2 className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold">
-                            Requisitos do Alvo
-                          </h3>
-                          <p className="text-sm text-zinc-500">
-                            Defina as necessidades estruturais.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-1">
-                          <Label>Resistência Característica (Fck)</Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              value={target.fck}
-                              onChange={(e) =>
-                                setTarget({
-                                  ...target,
-                                  fck: Number(e.target.value),
-                                })
-                              }
-                            />
-                            <span className="absolute right-4 top-3 text-zinc-500 text-sm">
-                              MPa
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-zinc-500 pt-1">
-                            Min: 20 MPa para concreto estrutural
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label>Desvio Padrão (Sd)</Label>
-                          <Input
-                            type="number"
-                            value={target.standardDeviation}
-                            onChange={(e) =>
-                              setTarget({
-                                ...target,
-                                standardDeviation: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </div>
-
-                        <div className="col-span-1 md:col-span-2 space-y-1">
-                          <div className="flex justify-between">
-                            <Label>Slump (Abatimento)</Label>
-                            <span className="text-amber-500 font-mono text-sm">
-                              {target.slump} mm
-                            </span>
-                          </div>
-                          <input
-                            type="range"
-                            min="40"
-                            max="220"
-                            step="10"
-                            value={target.slump}
-                            onChange={(e) =>
-                              setTarget({
-                                ...target,
-                                slump: Number(e.target.value),
-                              })
-                            }
-                            className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                          />
-                          <div className="flex justify-between text-[10px] text-zinc-600 px-1 pt-2">
-                            <span>Seco (40)</span>
-                            <span>Plástico (100)</span>
-                            <span>Fluido (220)</span>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-
-                    <button
-                      onClick={() => setStep(2)}
-                      className="w-full bg-zinc-100 text-zinc-950 font-bold py-4 rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 group shadow-lg shadow-white/5"
-                    >
-                      Próximo Passo{" "}
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
-
-                {/* STEP 2: MATERIALS */}
-                {step === 2 && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <Card hover>
-                      <div className="flex items-center gap-3 mb-6 border-b border-zinc-800 pb-4">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                          <Layers className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold">
-                            Propriedades dos Materiais
-                          </h3>
-                          <p className="text-sm text-zinc-500">
-                            Especificações dos materiais disponíveis.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-8">
-                        {/* Cement Section */}
-                        <div className="space-y-4">
-                          <h4 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>{" "}
-                            Cimento
-                          </h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Tipo</Label>
-                              <Select
-                                options={[
-                                  "CP I-32",
-                                  "CP II-E-32",
-                                  "CP II-Z-32",
-                                  "CP III-40",
-                                  "CP V-ARI",
-                                ]}
-                                value={materials.cement.type}
-                                onChange={(v) =>
-                                  setMaterials({
-                                    ...materials,
-                                    cement: { ...materials.cement, type: v },
-                                  })
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label>Densidade (g/cm³)</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={materials.cement.density}
-                                onChange={(e) =>
-                                  setMaterials({
-                                    ...materials,
-                                    cement: {
-                                      ...materials.cement,
-                                      density: Number(e.target.value),
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Aggregates Section */}
-                        <div className="space-y-4">
-                          <h4 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>{" "}
-                            Agregado Miúdo (Areia)
-                          </h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Módulo de Finura</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={materials.sand.modulus}
-                                onChange={(e) =>
-                                  setMaterials({
-                                    ...materials,
-                                    sand: {
-                                      ...materials.sand,
-                                      modulus: Number(e.target.value),
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label>Massa Unitária (kg/dm³)</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={materials.sand.unitMass}
-                                onChange={(e) =>
-                                  setMaterials({
-                                    ...materials,
-                                    sand: {
-                                      ...materials.sand,
-                                      unitMass: Number(e.target.value),
-                                    },
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => setStep(1)}
-                        className="px-6 py-4 rounded-xl font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
-                      >
-                        Voltar
-                      </button>
-                      <button
-                        onClick={handleCalculate}
-                        disabled={isCalculating}
-                        className="flex-1 bg-amber-500 text-zinc-950 font-bold py-4 rounded-xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isCalculating ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />
-                            Calculando...
-                          </>
-                        ) : (
-                          <>
-                            Calcular Traço <Calculator className="w-5 h-5" />
-                          </>
+                  {/* STEP 1: EXPERIMENTAL POINTS */}
+                  {step === 1 && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
+                      <Card
+                        className={cn(
+                          "border shadow-sm transition-all",
+                          colors.cardBg,
+                          colors.cardHover
                         )}
-                      </button>
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center",
+                                darkMode
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : "bg-emerald-500/10 text-emerald-600"
+                              )}
+                            >
+                              <FlaskConical className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <CardTitle className={colors.text}>
+                                Pontos Experimentais
+                              </CardTitle>
+                              <CardDescription className={colors.textMuted}>
+                                Dados dos traços Rico, Piloto e Pobre
+                              </CardDescription>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {fields.map((field, index) => (
+                            <div
+                              key={field.id}
+                              className={cn(
+                                "p-4 rounded-xl border",
+                                darkMode
+                                  ? "bg-slate-950/50 border-slate-800"
+                                  : "bg-gray-50/80 border-gray-100"
+                              )}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <span
+                                  className={cn(
+                                    "text-sm font-bold uppercase tracking-wider",
+                                    colors.accentText
+                                  )}
+                                >
+                                  Traço {traceLabels[index]}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <Label
+                                    className={cn("text-xs", colors.textMuted)}
+                                  >
+                                    Traço (m)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    className={cn(
+                                      "h-9 text-sm",
+                                      colors.inputBg
+                                    )}
+                                    {...register(
+                                      `experimentalPoints.${index}.m`
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label
+                                    className={cn("text-xs", colors.textMuted)}
+                                  >
+                                    a/c
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className={cn(
+                                      "h-9 text-sm",
+                                      colors.inputBg
+                                    )}
+                                    {...register(
+                                      `experimentalPoints.${index}.ac`
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label
+                                    className={cn("text-xs", colors.textMuted)}
+                                  >
+                                    fcj (MPa)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    className={cn(
+                                      "h-9 text-sm",
+                                      colors.inputBg
+                                    )}
+                                    {...register(
+                                      `experimentalPoints.${index}.fcj`
+                                    )}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label
+                                    className={cn("text-xs", colors.textMuted)}
+                                  >
+                                    Dens. (kg/m³)
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="1"
+                                    className={cn(
+                                      "h-9 text-sm",
+                                      colors.inputBg
+                                    )}
+                                    {...register(
+                                      `experimentalPoints.${index}.density`
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+
+                      <Button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        className={cn(
+                          "w-full py-6 text-base font-bold shadow-lg transition-all group",
+                          darkMode
+                            ? "bg-slate-100 text-slate-900 hover:bg-white"
+                            : "bg-gray-900 text-white hover:bg-gray-800"
+                        )}
+                      >
+                        Próximo Passo{" "}
+                        <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Button>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* STEP 3: RESULTS (Detailed breakdown for mobile/desktop flow) */}
-                {step === 3 && result && (
-                  <div className="lg:hidden animate-in fade-in slide-in-from-bottom-8 duration-500">
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
-                      <h3 className="text-amber-500 font-bold mb-1">
-                        Cálculo Completo
-                      </h3>
-                      <p className="text-xs text-zinc-400">
-                        Dosagem otimizada para {target.fck} MPa
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  {/* STEP 2: TARGET PARAMETERS */}
+                  {step === 2 && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                      <Card
+                        className={cn(
+                          "border shadow-sm transition-all",
+                          colors.cardBg,
+                          colors.cardHover
+                        )}
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center",
+                                darkMode
+                                  ? "bg-blue-500/10 text-blue-400"
+                                  : "bg-blue-500/10 text-blue-600"
+                              )}
+                            >
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <CardTitle className={colors.text}>
+                                Especificações do Concreto
+                              </CardTitle>
+                              <CardDescription className={colors.textMuted}>
+                                Parâmetros de projeto desejados
+                              </CardDescription>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                fck (MPa)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("target.fck")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Desvio Padrão
+                              </Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                className={colors.inputBg}
+                                {...register("target.sd")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Agressividade
+                              </Label>
+                              <Select
+                                defaultValue="2"
+                                onValueChange={(v) =>
+                                  setValue(
+                                    "target.aggressivenessClass",
+                                    parseInt(v)
+                                  )
+                                }
+                              >
+                                <SelectTrigger className={colors.inputBg}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">I - Fraca</SelectItem>
+                                  <SelectItem value="2">
+                                    II - Moderada
+                                  </SelectItem>
+                                  <SelectItem value="3">III - Forte</SelectItem>
+                                  <SelectItem value="4">
+                                    IV - Muito Forte
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Tipo Elemento
+                              </Label>
+                              <Select
+                                defaultValue="CA"
+                                onValueChange={(v) =>
+                                  setValue(
+                                    "target.elementType",
+                                    v as "CA" | "CP"
+                                  )
+                                }
+                              >
+                                <SelectTrigger className={colors.inputBg}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="CA">
+                                    Concreto Armado
+                                  </SelectItem>
+                                  <SelectItem value="CP">
+                                    Concreto Protendido
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Abatimento (mm)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("target.slump")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Teor Argamassa (%)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("target.mortarContent")}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-              {/* Right Column: Live Preview & Results */}
-              <div className="lg:col-span-5 space-y-6">
-                {/* Always visible Summary Card */}
-                <Card className="bg-zinc-900/80 sticky top-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-semibold text-zinc-100">
-                      Especificações Projetadas
-                    </h3>
-                    <TrendingUp className="w-5 h-5 text-zinc-500" />
-                  </div>
-
-                  {!result ? (
-                    <div className="space-y-6">
-                      {/* Empty State / Preview of inputs */}
-                      <div className="flex justify-between items-center py-3 border-b border-zinc-800/50">
-                        <span className="text-sm text-zinc-500">Fck Alvo</span>
-                        <span className="text-xl font-mono font-bold text-zinc-300">
-                          {target.fck}{" "}
-                          <span className="text-xs text-zinc-600">MPa</span>
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-3 border-b border-zinc-800/50">
-                        <span className="text-sm text-zinc-500">
-                          Fck Dosagem (Fcj)
-                        </span>
-                        <span className="text-xl font-mono font-bold text-amber-500">
-                          {(
-                            target.fck +
-                            1.65 * target.standardDeviation
-                          ).toFixed(1)}{" "}
-                          <span className="text-xs text-zinc-600">MPa</span>
-                        </span>
-                      </div>
-
-                      <div className="bg-zinc-950 rounded-lg p-4 mt-8 flex flex-col items-center justify-center text-center space-y-3 min-h-[200px] border border-zinc-800 border-dashed">
-                        <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center">
-                          <Construction className="w-6 h-6 text-zinc-700" />
-                        </div>
-                        <p className="text-sm text-zinc-500 max-w-[200px]">
-                          Complete os passos para gerar o diagrama de mistura e
-                          o relatório de consumo.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-8 animate-in zoom-in-95 duration-500">
-                      {/* Result State */}
-                      <div className="text-center p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50" />
-                        <h4 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">
-                          Traço Unitário (Massa)
-                        </h4>
-                        <div className="text-4xl lg:text-5xl font-black text-white tracking-tight font-mono">
-                          1 : {result.trace.sand.toFixed(2)} :{" "}
-                          {result.trace.gravel.toFixed(2)}
-                        </div>
-                        <div className="text-lg text-amber-500/80 font-mono mt-1 font-medium">
-                          a/c = {result.trace.water.toFixed(2)}
-                        </div>
-                      </div>
-
-                      {/* Consumption Table */}
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-semibold text-zinc-400">
-                          Consumo de Materiais (kg/m³)
-                        </h4>
-                        {[
-                          {
-                            label: "Cimento",
-                            value: result.consumption.cement,
-                            color: "bg-amber-500",
-                          },
-                          {
-                            label: "Areia",
-                            value: result.consumption.sand,
-                            color: "bg-amber-300",
-                          },
-                          {
-                            label: "Brita",
-                            value: result.consumption.gravel,
-                            color: "bg-zinc-600",
-                          },
-                          {
-                            label: "Água",
-                            value: result.consumption.water,
-                            color: "bg-blue-500",
-                          },
-                        ].map((item) => (
-                          <div
-                            key={item.label}
-                            className="flex items-center justify-between group"
-                          >
+                      {/* Container Config */}
+                      <Card
+                        className={cn(
+                          "border shadow-sm transition-all",
+                          colors.cardBg,
+                          colors.cardHover
+                        )}
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div
-                                className={`w-2 h-2 rounded-full ${item.color}`}
-                              />
-                              <span className="text-sm text-zinc-300">
-                                {item.label}
-                              </span>
+                                className={cn(
+                                  "w-10 h-10 rounded-full flex items-center justify-center",
+                                  darkMode
+                                    ? "bg-amber-500/10 text-amber-400"
+                                    : "bg-amber-500/10 text-amber-600"
+                                )}
+                              >
+                                <Layers className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <CardTitle className={colors.text}>
+                                  📦 Cálculo de Betonadas
+                                </CardTitle>
+                                <CardDescription className={colors.textMuted}>
+                                  Opcional: dimensões do recipiente
+                                </CardDescription>
+                              </div>
                             </div>
-                            <span className="font-mono font-medium text-zinc-100 group-hover:text-amber-500 transition-colors">
-                              {item.value}{" "}
-                              <span className="text-zinc-600 text-xs">kg</span>
-                            </span>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="w-5 h-5 rounded"
+                                {...register("containerConfig.enabled")}
+                              />
+                              <span className={cn("text-sm", colors.textMuted)}>
+                                Ativar
+                              </span>
+                            </label>
                           </div>
-                        ))}
-                      </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Comprimento (cm)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("containerConfig.lengthCm")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Largura (cm)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("containerConfig.widthCm")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Altura (cm)
+                              </Label>
+                              <Input
+                                type="number"
+                                className={colors.inputBg}
+                                {...register("containerConfig.heightCm")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className={colors.textMuted}>
+                                Volume Total (m³)
+                              </Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                className={colors.inputBg}
+                                {...register("containerConfig.concreteVolume")}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                      {/* Chart */}
-                      <div className="h-64 w-full mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={volumeData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                              stroke="none"
-                            >
-                              {volumeData.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={entry.color}
-                                />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: "#18181b",
-                                borderColor: "#27272a",
-                                borderRadius: "8px",
-                                color: "#fff",
-                              }}
-                              itemStyle={{ color: "#fff" }}
-                            />
-                            <Legend verticalAlign="bottom" height={36} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-800">
-                        <button
-                          onClick={handleExport}
-                          className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
+                      <div className="flex gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setStep(1)}
+                          className={cn(
+                            "px-6 py-6",
+                            darkMode ? "border-slate-700" : ""
+                          )}
                         >
-                          <Printer className="w-4 h-4" /> Imprimir PDF
-                        </button>
-                        <button
-                          onClick={handleExport}
-                          className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
+                          Voltar
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className={cn(
+                            "flex-1 py-6 text-base font-bold shadow-lg",
+                            darkMode
+                              ? "bg-emerald-600 hover:bg-emerald-500"
+                              : "bg-emerald-500 hover:bg-emerald-600"
+                          )}
                         >
-                          <Download className="w-4 h-4" /> Exportar CSV
-                        </button>
-                      </div>
-
-                      <div className="pt-2">
-                        <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-lg text-blue-400 text-xs">
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          <p>
-                            Valores estimados baseados no método IPT. Sempre
-                            realize ajustes experimentais em betoneira antes da
-                            produção.
-                          </p>
-                        </div>
+                          {loading ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                              Calculando...
+                            </>
+                          ) : (
+                            <>
+                              Calcular Traço{" "}
+                              <Calculator className="w-5 h-5 ml-2" />
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   )}
-                </Card>
+
+                  {/* STEP 3: Show compact summary on mobile */}
+                  {step === 3 && result?.success && (
+                    <div className="lg:hidden space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                      <Card className={cn("border", colors.cardBg)}>
+                        <CardHeader>
+                          <CardTitle
+                            className={cn(
+                              "flex items-center gap-2",
+                              colors.accentText
+                            )}
+                          >
+                            <CheckCircle2 className="w-5 h-5" />
+                            Cálculo Completo
+                          </CardTitle>
+                          <CardDescription className={colors.textMuted}>
+                            Dosagem otimizada para {target.fck} MPa
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div
+                            className={cn(
+                              "text-center p-4 rounded-xl border mb-4",
+                              darkMode
+                                ? "bg-emerald-500/10 border-emerald-500/20"
+                                : "bg-emerald-50 border-emerald-200"
+                            )}
+                          >
+                            <p
+                              className={cn(
+                                "text-xs font-bold uppercase tracking-widest mb-1",
+                                colors.accentText
+                              )}
+                            >
+                              Traço Unitário
+                            </p>
+                            <p
+                              className={cn(
+                                "text-3xl font-black font-mono",
+                                colors.text
+                              )}
+                            >
+                              1 : {result.data?.finalTrace.sand.toFixed(2)} :{" "}
+                              {result.data?.finalTrace.gravel.toFixed(2)}
+                            </p>
+                            <p
+                              className={cn(
+                                "text-lg font-mono mt-1",
+                                colors.accentText
+                              )}
+                            >
+                              a/c = {result.data?.finalTrace.water.toFixed(2)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => setStep(1)}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            Nova Dosagem
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT COLUMN: Results */}
+                <div className="lg:col-span-7 space-y-6">
+                  {/* Live Preview Card */}
+                  <Card
+                    className={cn(
+                      "border shadow-sm sticky top-6",
+                      colors.cardBg
+                    )}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className={colors.text}>
+                          Especificações Projetadas
+                        </CardTitle>
+                        <TrendingUp
+                          className={cn("w-5 h-5", colors.textMuted)}
+                        />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {!result?.success ? (
+                        <div className="space-y-4">
+                          <div
+                            className={cn(
+                              "flex justify-between items-center py-3 border-b",
+                              darkMode
+                                ? "border-slate-800/50"
+                                : "border-gray-100"
+                            )}
+                          >
+                            <span className={cn("text-sm", colors.textMuted)}>
+                              Fck Alvo
+                            </span>
+                            <span
+                              className={cn(
+                                "text-xl font-mono font-bold",
+                                colors.text
+                              )}
+                            >
+                              {target.fck}{" "}
+                              <span className={cn("text-xs", colors.textMuted)}>
+                                MPa
+                              </span>
+                            </span>
+                          </div>
+                          <div
+                            className={cn(
+                              "flex justify-between items-center py-3 border-b",
+                              darkMode
+                                ? "border-slate-800/50"
+                                : "border-gray-100"
+                            )}
+                          >
+                            <span className={cn("text-sm", colors.textMuted)}>
+                              Fck Dosagem (Fcj)
+                            </span>
+                            <span
+                              className={cn(
+                                "text-xl font-mono font-bold",
+                                colors.accentText
+                              )}
+                            >
+                              {(target.fck + 1.65 * target.sd).toFixed(1)}{" "}
+                              <span className={cn("text-xs", colors.textMuted)}>
+                                MPa
+                              </span>
+                            </span>
+                          </div>
+
+                          <div
+                            className={cn(
+                              "rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-3 min-h-[150px] border border-dashed",
+                              darkMode
+                                ? "bg-slate-950 border-slate-800"
+                                : "bg-gray-50 border-gray-200"
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "w-12 h-12 rounded-full flex items-center justify-center",
+                                darkMode ? "bg-slate-900" : "bg-gray-100"
+                              )}
+                            >
+                              <Construction
+                                className={cn("w-6 h-6", colors.textMuted)}
+                              />
+                            </div>
+                            <p
+                              className={cn(
+                                "text-sm max-w-[220px]",
+                                colors.textMuted
+                              )}
+                            >
+                              Complete os passos para gerar o diagrama de
+                              mistura e o relatório de consumo.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-6 animate-in zoom-in-95 duration-500">
+                          {/* Result State */}
+                          <div
+                            className={cn(
+                              "text-center p-6 rounded-2xl relative overflow-hidden",
+                              darkMode
+                                ? "bg-emerald-500/10 border border-emerald-500/20"
+                                : "bg-emerald-50 border border-emerald-200"
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-50",
+                                colors.accentText
+                              )}
+                            />
+                            <h4
+                              className={cn(
+                                "text-xs font-bold uppercase tracking-widest mb-2",
+                                colors.accentText
+                              )}
+                            >
+                              Traço Unitário (Massa)
+                            </h4>
+                            <div
+                              className={cn(
+                                "text-4xl lg:text-5xl font-black tracking-tight font-mono",
+                                colors.text
+                              )}
+                            >
+                              1 : {result.data?.finalTrace.sand.toFixed(2)} :{" "}
+                              {result.data?.finalTrace.gravel.toFixed(2)}
+                            </div>
+                            <div
+                              className={cn(
+                                "text-lg font-mono mt-1 font-medium",
+                                colors.accentText
+                              )}
+                            >
+                              a/c = {result.data?.finalTrace.water.toFixed(2)}
+                            </div>
+                          </div>
+
+                          {/* Consumption Table */}
+                          <div className="space-y-2">
+                            <h4
+                              className={cn(
+                                "text-sm font-semibold",
+                                colors.textMuted
+                              )}
+                            >
+                              Consumo de Materiais (kg/m³)
+                            </h4>
+                            {[
+                              {
+                                label: "Cimento",
+                                value: result.data?.consumption.cement,
+                                color: darkMode
+                                  ? "bg-emerald-500"
+                                  : "bg-emerald-600",
+                              },
+                              {
+                                label: "Areia",
+                                value: result.data?.consumption.sand,
+                                color: "bg-amber-500",
+                              },
+                              {
+                                label: "Brita",
+                                value: result.data?.consumption.gravel,
+                                color: "bg-gray-500",
+                              },
+                              {
+                                label: "Água",
+                                value: result.data?.consumption.water,
+                                color: "bg-blue-500",
+                              },
+                            ].map((item) => (
+                              <div
+                                key={item.label}
+                                className="flex items-center justify-between group py-1"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={cn(
+                                      "w-2 h-2 rounded-full",
+                                      item.color
+                                    )}
+                                  />
+                                  <span className={cn("text-sm", colors.text)}>
+                                    {item.label}
+                                  </span>
+                                </div>
+                                <span
+                                  className={cn(
+                                    "font-mono font-medium transition-colors",
+                                    colors.text,
+                                    darkMode
+                                      ? "group-hover:text-emerald-400"
+                                      : "group-hover:text-emerald-600"
+                                  )}
+                                >
+                                  {item.value}{" "}
+                                  <span
+                                    className={cn("text-xs", colors.textMuted)}
+                                  >
+                                    kg
+                                  </span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Warnings */}
+                          {result.data?.warnings &&
+                            result.data.warnings.length > 0 && (
+                              <Alert
+                                className={
+                                  darkMode
+                                    ? "bg-amber-500/10 border-amber-500/20"
+                                    : "bg-amber-50 border-amber-200"
+                                }
+                              >
+                                <AlertCircle className="h-4 w-4 text-amber-500" />
+                                <AlertTitle
+                                  className={
+                                    darkMode
+                                      ? "text-amber-400"
+                                      : "text-amber-700"
+                                  }
+                                >
+                                  Avisos
+                                </AlertTitle>
+                                <AlertDescription className={colors.textMuted}>
+                                  <ul className="list-disc list-inside text-sm space-y-1">
+                                    {result.data.warnings.map((w, i) => (
+                                      <li key={i}>{w}</li>
+                                    ))}
+                                  </ul>
+                                </AlertDescription>
+                              </Alert>
+                            )}
+
+                          {/* Batch Results */}
+                          {result.data?.batchResult && (
+                            <div
+                              className={cn(
+                                "p-4 rounded-xl border",
+                                colors.cardBg
+                              )}
+                            >
+                              <h4
+                                className={cn(
+                                  "text-sm font-semibold mb-3",
+                                  colors.text
+                                )}
+                              >
+                                📦 Betonadas (
+                                {result.data.batchResult.numberOfBatches}x)
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className={colors.textMuted}>
+                                  Por betonada:
+                                </div>
+                                <div className={cn("font-mono", colors.text)}>
+                                  C:{" "}
+                                  {result.data.batchResult.perBatch.cement.toFixed(
+                                    1
+                                  )}
+                                  kg
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Error Alert */}
+                  {result && !result.success && result.error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Erro: {result.error.code}</AlertTitle>
+                      <AlertDescription>
+                        {result.error.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Charts & Diagram */}
+                  {result?.success && result.data && (
+                    <>
+                      <UnifiedIPTDiagram
+                        experimentalPoints={experimentalPoints}
+                        coefficients={result.data.coefficients}
+                        parameters={result.data.parameters}
+                        cementConsumption={result.data.consumption.cement}
+                        darkMode={darkMode}
+                      />
+
+                      <DosageCharts
+                        experimentalPoints={experimentalPoints}
+                        coefficients={result.data.coefficients}
+                        parameters={result.data.parameters}
+                        cementConsumption={result.data.consumption.cement}
+                        darkMode={darkMode}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            </form>
           </div>
         </main>
       </div>
+
+      {/* Footer */}
+      <footer
+        className={cn(
+          "lg:ml-72 border-t py-4 px-6",
+          darkMode
+            ? "border-slate-800 bg-slate-950"
+            : "border-gray-200 bg-gray-50"
+        )}
+      >
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+          <p className={cn("text-sm", colors.textMuted)}>
+            Desenvolvido por{" "}
+            <a
+              href="https://github.com/fcfim"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn("font-medium hover:underline", colors.accentText)}
+            >
+              @fcfim
+            </a>
+          </p>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/fcfim/Concrete-Mix-Design-IPT-Method"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                "text-sm transition-colors",
+                colors.textMuted,
+                darkMode ? "hover:text-white" : "hover:text-gray-900"
+              )}
+            >
+              GitHub
+            </a>
+            <a
+              href="https://www.linkedin.com/in/filipefim"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                "text-sm transition-colors",
+                colors.textMuted,
+                darkMode ? "hover:text-white" : "hover:text-gray-900"
+              )}
+            >
+              LinkedIn
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
